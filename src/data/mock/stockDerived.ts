@@ -26,6 +26,7 @@ export interface StockMovement {
   repName?: string
   reason?: string
   notes?: string
+  return_condition?: 'sellable' | 'damaged' | 'expired'
   updated_at?: string
 }
 
@@ -138,7 +139,43 @@ export function addBatch(data: Omit<BatchRecord, 'id' | 'updated_at'>) {
   return batch
 }
 
+export function getReturnCondition(
+  movement: StockMovement,
+  batchExpiryDate?: string,
+): 'sellable' | 'damaged' | 'expired' {
+  if (movement.return_condition) {
+    return movement.return_condition
+  }
+  const reasonLower = `${movement.reason || ''} ${movement.notes || ''}`.toLowerCase()
+  if (
+    reasonLower.includes('damage') ||
+    reasonLower.includes('defect') ||
+    reasonLower.includes('broken') ||
+    reasonLower.includes('tore') ||
+    reasonLower.includes('compromised')
+  ) {
+    return 'damaged'
+  }
+  if (reasonLower.includes('expired')) {
+    return 'expired'
+  }
+  if (batchExpiryDate && computeDaysToExpiry(batchExpiryDate) <= 0) {
+    return 'expired'
+  }
+  return 'sellable'
+}
+
 export function addStockMovement(data: Omit<StockMovement, 'id' | 'updated_at' | 'date'> & { id?: string; date?: string }) {
+  if (!Number.isFinite(data.quantity)) {
+    throw new Error('Stock movement quantity must be a valid number.')
+  }
+  if (data.type !== 'adjustment' && (!Number.isInteger(data.quantity) || data.quantity <= 0)) {
+    throw new Error('Stock movement quantity must be a positive integer.')
+  }
+  if (data.type === 'adjustment' && (!Number.isInteger(data.quantity) || data.quantity === 0)) {
+    throw new Error('Stock adjustment quantity must be a non-zero integer.')
+  }
+
   const at = now()
   const movement: StockMovement = {
     ...data,
@@ -154,6 +191,14 @@ export function addStockMovement(data: Omit<StockMovement, 'id' | 'updated_at' |
 export type BatchExpiryStatus = 'expired' | 'critical' | 'warning' | 'healthy'
 
 export function computeDaysToExpiry(expiryDateStr: string): number {
+  if (!expiryDateStr) return 0
+  const parts = expiryDateStr.split('-').map(Number)
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+    const target = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0).getTime()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return Math.round((target - today.getTime()) / (1000 * 60 * 60 * 24))
+  }
   const target = new Date(expiryDateStr).getTime()
   const today = new Date().setHours(0, 0, 0, 0)
   return Math.ceil((target - today) / (1000 * 60 * 60 * 24))
@@ -211,11 +256,15 @@ export function deriveBatches(
 
     const initial = receipts > 0 ? receipts : b.initial_qty
 
-    // Deductions: sell_in, sample, transfer_rep
+    // Deductions: sell_in, direct warehouse samples (without rep), transfer_rep
+    // Rep samples are fulfilled out of the rep's buffer (transfers_rep) so they
+    // must NOT be deducted twice from warehouse batch balances.
     const deductions = movements
       .filter(
         (m) =>
-          (m.type === 'sell_in' || m.type === 'sample' || m.type === 'transfer_rep') &&
+          (m.type === 'sell_in' ||
+            (m.type === 'sample' && !m.repName && !m.rep_id) ||
+            m.type === 'transfer_rep') &&
           (m.batchNumber === b.batch_no || m.batch_id === b.id)
       )
       .reduce((sum, m) => sum + m.quantity, 0)
@@ -225,7 +274,17 @@ export function deriveBatches(
       .filter((m) => m.type === 'adjustment' && (m.batchNumber === b.batch_no || m.batch_id === b.id))
       .reduce((sum, m) => sum + m.quantity, 0)
 
-    const remaining = Math.max(0, initial - deductions + adjustments)
+    // Sellable returns: damaged and expired returned products do not return to sellable inventory
+    const sellableReturns = movements
+      .filter(
+        (m) =>
+          m.type === 'return' &&
+          getReturnCondition(m, b.expiry_date) === 'sellable' &&
+          (m.batchNumber === b.batch_no || m.batch_id === b.id)
+      )
+      .reduce((sum, m) => sum + m.quantity, 0)
+
+    const remaining = Math.max(0, initial - deductions + adjustments + sellableReturns)
     const days = computeDaysToExpiry(b.expiry_date)
     const statusInfo = getBatchStatus(days)
 
@@ -257,7 +316,7 @@ export function deriveBatches(
   return results
 }
 
-// ── FEFO Allocation (shared by order approval & sample delivery) ─────────────
+// ── FEFO Allocation (shared by order approval & warehouse fulfillment) ─────────
 export interface FefoAllocation {
   productName: string
   batchId: string
@@ -279,17 +338,13 @@ export function allocateFefo(
   }
 
   const allocations: FefoAllocation[] = []
-  const remainingByBatch = new Map<string, number>()
   let needed = quantity
 
-  for (const batch of deriveBatches(batches, movements, productName)) {
-    if (batch.is_expired || batch.qty_remaining <= 0) continue
-    if (!remainingByBatch.has(batch.id)) {
-      remainingByBatch.set(batch.id, batch.qty_remaining)
-    }
+  const availableBatches = deriveBatches(batches, movements, productName)
+    .filter((b) => !b.is_expired && b.qty_remaining > 0)
 
-    const remaining = remainingByBatch.get(batch.id) ?? 0
-    const take = Math.min(needed, remaining)
+  for (const batch of availableBatches) {
+    const take = Math.min(needed, batch.qty_remaining)
     if (take <= 0) continue
 
     allocations.push({
@@ -299,14 +354,134 @@ export function allocateFefo(
       quantity: take,
     })
 
-    remainingByBatch.set(batch.id, remaining - take)
     needed -= take
-
     if (needed === 0) break
   }
 
   if (needed > 0) {
     throw new Error(`Insufficient unexpired stock for ${productName}.`)
+  }
+
+  return allocations
+}
+
+// ── Rep Sample Custody & Allocation ──────────────────────────────────────────
+export interface RepSampleBatch {
+  productName: string
+  batchId: string
+  batchNumber: string
+  expiryDate: string
+  isExpired: boolean
+  remainingQty: number
+}
+
+export function getRepSampleBatches(
+  repName: string,
+  productName: string,
+  batches: BatchRecord[],
+  movements: StockMovement[]
+): RepSampleBatch[] {
+  const normRep = repName.trim().toLowerCase()
+  const normProd = productName.trim().toLowerCase()
+
+  const repTransfers = movements.filter(
+    (m) =>
+      m.type === 'transfer_rep' &&
+      m.repName?.trim().toLowerCase() === normRep &&
+      m.productName.trim().toLowerCase() === normProd
+  )
+
+  const repSamples = movements.filter(
+    (m) =>
+      m.type === 'sample' &&
+      m.repName?.trim().toLowerCase() === normRep &&
+      m.productName.trim().toLowerCase() === normProd
+  )
+
+  const transferredByBatch = new Map<string, number>()
+  for (const t of repTransfers) {
+    const key = t.batchNumber || t.batch_id || 'UNKNOWN'
+    transferredByBatch.set(key, (transferredByBatch.get(key) ?? 0) + t.quantity)
+  }
+
+  const sampledByBatch = new Map<string, number>()
+  for (const s of repSamples) {
+    const key = s.batchNumber || s.batch_id || 'UNKNOWN'
+    sampledByBatch.set(key, (sampledByBatch.get(key) ?? 0) + s.quantity)
+  }
+
+  const list: RepSampleBatch[] = []
+  for (const [batchNo, transferred] of transferredByBatch.entries()) {
+    const sampled = sampledByBatch.get(batchNo) ?? 0
+    const remaining = Math.max(0, transferred - sampled)
+    if (remaining <= 0) continue
+
+    const batchRecord = batches.find(
+      (b) => b.batch_no === batchNo && b.productName.trim().toLowerCase() === normProd
+    )
+    const expiryDate = batchRecord?.expiry_date || '2099-12-31'
+    const days = computeDaysToExpiry(expiryDate)
+
+    list.push({
+      productName,
+      batchId: batchRecord?.id || batchNo,
+      batchNumber: batchNo,
+      expiryDate,
+      isExpired: days <= 0,
+      remainingQty: remaining,
+    })
+  }
+
+  list.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())
+  return list
+}
+
+export function getRepAvailableSampleStock(
+  repName: string,
+  productName: string,
+  batches: BatchRecord[],
+  movements: StockMovement[]
+): number {
+  const sampleBatches = getRepSampleBatches(repName, productName, batches, movements)
+  return sampleBatches
+    .filter((b) => !b.isExpired)
+    .reduce((sum, b) => sum + b.remainingQty, 0)
+}
+
+export function allocateRepSampleFefo(
+  repName: string,
+  productName: string,
+  quantity: number,
+  batches: BatchRecord[],
+  movements: StockMovement[]
+): FefoAllocation[] {
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error(`Invalid sample quantity for ${productName}.`)
+  }
+
+  const sampleBatches = getRepSampleBatches(repName, productName, batches, movements)
+    .filter((b) => !b.isExpired && b.remainingQty > 0)
+
+  const allocations: FefoAllocation[] = []
+  let needed = quantity
+
+  for (const b of sampleBatches) {
+    const take = Math.min(needed, b.remainingQty)
+    if (take <= 0) continue
+
+    allocations.push({
+      productName,
+      batchId: b.batchId,
+      batchNumber: b.batchNumber,
+      quantity: take,
+    })
+
+    needed -= take
+    if (needed === 0) break
+  }
+
+  if (needed > 0) {
+    throw new Error(`Insufficient sample stock for representative ${repName} (${productName}).`)
   }
 
   return allocations
@@ -319,9 +494,12 @@ export interface DerivedProductStock {
   sell_in: number
   sell_out: number
   in_warehouse: number
-  in_market: number // sell_in - sell_out
+  in_market: number // sell_in - sell_out - returns
   samples: number
   returns: number
+  sellable_returns: number
+  damaged_returns: number
+  expired_returns: number
   adjustments: number
   transfers_rep: number
   sell_through_pct: number
@@ -357,12 +535,34 @@ export function deriveProductStock(
     .filter((m) => m.type === 'sell_out')
     .reduce((sum, m) => sum + m.quantity, 0)
 
+  // All samples (rep and direct)
   const samples = pMovements
     .filter((m) => m.type === 'sample')
     .reduce((sum, m) => sum + m.quantity, 0)
 
+  // Direct warehouse samples (not dispatched via a rep)
+  const direct_samples = pMovements
+    .filter((m) => m.type === 'sample' && !m.repName && !m.rep_id)
+    .reduce((sum, m) => sum + m.quantity, 0)
+
+  // Total returns
   const returns = pMovements
     .filter((m) => m.type === 'return')
+    .reduce((sum, m) => sum + m.quantity, 0)
+
+  // Sellable returns (returned in good condition, unexpired)
+  const sellable_returns = pMovements
+    .filter((m) => m.type === 'return' && getReturnCondition(m) === 'sellable')
+    .reduce((sum, m) => sum + m.quantity, 0)
+
+  // Damaged returned products
+  const damaged_returns = pMovements
+    .filter((m) => m.type === 'return' && getReturnCondition(m) === 'damaged')
+    .reduce((sum, m) => sum + m.quantity, 0)
+
+  // Expired returned products
+  const expired_returns = pMovements
+    .filter((m) => m.type === 'return' && getReturnCondition(m) === 'expired')
     .reduce((sum, m) => sum + m.quantity, 0)
 
   const adjustments = pMovements
@@ -373,20 +573,18 @@ export function deriveProductStock(
     .filter((m) => m.type === 'transfer_rep')
     .reduce((sum, m) => sum + m.quantity, 0)
 
-  // In warehouse now: received - sell_in - samples + returns + adjustments - transfers_rep
-  const in_warehouse = Math.max(
-    0,
-    received - sell_in - samples + returns + adjustments - transfers_rep
-  )
-
-  // In market: sell_in - sell_out
-  const in_market = Math.max(0, sell_in - sell_out)
-
-  // Sell-through %
-  const sell_through_pct = sell_in > 0 ? Math.round((sell_out / sell_in) * 100) : 0
-
-  // Derived batches for this product
+  // Derived batches for this product (uses the same sellable returns and un-duplicated deductions)
   const derivedB = deriveBatches(batches, movements, productName)
+
+  // In warehouse now: total remaining quantity across all warehouse batches
+  // Formula: received - sell_in - direct_samples + sellable_returns + adjustments - transfers_rep
+  const in_warehouse = derivedB.reduce((sum, b) => sum + b.qty_remaining, 0)
+
+  // In market: sell_in minus sell_out minus returns
+  const in_market = Math.max(0, sell_in - sell_out - returns)
+
+  // Sell-through %: ratio of products dispensed to patients over sell-in
+  const sell_through_pct = sell_in > 0 ? Math.round((sell_out / sell_in) * 100) : 0
 
   const available_qty = derivedB
     .filter((b) => !b.is_expired)
@@ -405,6 +603,13 @@ export function deriveProductStock(
 
   // If role === 'rep', custody is transfers_rep minus samples given by this rep
   if (role === 'rep') {
+    const repAvailableSamples = getRepAvailableSampleStock(
+      currentUserName,
+      productName,
+      batches,
+      movements
+    )
+
     const repTransfers = pMovements
       .filter(
         (m) =>
@@ -432,10 +637,13 @@ export function deriveProductStock(
       in_market,
       samples: repSamples,
       returns: 0,
+      sellable_returns: 0,
+      damaged_returns: 0,
+      expired_returns: 0,
       adjustments: 0,
       transfers_rep: repTransfers,
       sell_through_pct,
-      available_qty: repCustody,
+      available_qty: repAvailableSamples,
       expired_qty: 0,
       expiring_90d_qty,
       nearest_expiry_date,
@@ -452,6 +660,9 @@ export function deriveProductStock(
     in_market,
     samples,
     returns,
+    sellable_returns,
+    damaged_returns,
+    expired_returns,
     adjustments,
     transfers_rep,
     sell_through_pct,

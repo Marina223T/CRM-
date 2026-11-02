@@ -21,10 +21,12 @@ import StockPage from '@/ui/pages/stock'
 import { StockDetailSheet } from '@/ui/pages/stock/components/StockDetailSheet'
 import SellInPage from '@/ui/pages/sell-in'
 import SellOutPage from '@/ui/pages/sell-out'
+import ReturnsPage from '@/ui/pages/returns'
 import TargetsPage from '@/ui/pages/targets'
 import VisitsPage from '@/ui/pages/visits'
 import { NewVisitWizard } from '@/ui/pages/visits/components/NewVisitWizard'
 import VisitPlanPage from '@/ui/pages/visit-plan'
+import BudgetsPage from '@/ui/pages/budgets'
 import AdminPage from '@/ui/pages/admin'
 import LoginPage from '@/ui/pages/login'
 import { LogoutConfirmDialog } from '@/ui/pages/login/components/LogoutConfirmDialog'
@@ -262,6 +264,7 @@ function AppContent() {
           )}
           {active === 'Sell-in' && <SellInPage onAction={action} />}
           {active === 'Sell-out' && <SellOutPage />}
+          {active === 'Returns' && <ReturnsPage onAction={action} />}
           {active === 'Targets' && <TargetsPage />}
           {active === 'Visits' && (
             <VisitsPage
@@ -272,7 +275,12 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Visit plan' && <VisitPlanPage />}
+          {active === 'Visit plan' && (
+            <VisitPlanPage role={role} currentUserName={currentUserName} />
+          )}
+          {active === 'Budgets' && (
+            <BudgetsPage role={role} currentUserName={currentUserName} />
+          )}
           {active === 'Reports' && (
             <ReportsPage
               role={role}

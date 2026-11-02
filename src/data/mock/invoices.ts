@@ -2,11 +2,20 @@ import { invoicesMockData, type InvoiceRecord } from '@/ui/pages/invoices/mock-d
 import { addAuditLog } from './audit'
 import { createStore } from './store'
 
+export type ApprovalHistoryEntry = {
+  action: 'Approved' | 'Rejected' | 'Resubmitted'
+  actor: string
+  timestamp: string
+  reason?: string
+}
+
 export type StoredInvoice = InvoiceRecord & {
   updated_at?: string
   // Sales order that produced this invoice (optional: legacy demo
   // invoices were uploaded independently and have no origin order).
   order_id?: string
+  rejection_reason?: string
+  approval_history?: ApprovalHistoryEntry[]
 }
 
 export const invoicesStore = createStore<StoredInvoice[]>('invoices', invoicesMockData as StoredInvoice[])

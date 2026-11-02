@@ -213,6 +213,10 @@ export function StockActionModal({
           setErrorMsg(t('stock.modal.errNoBatchStock', { count: firstStockedBatch?.qty_remaining ?? 0 }))
           return
         }
+        if (qty > chosenBatch.qty_remaining) {
+          setErrorMsg(t('stock.modal.errNoBatchStock', { count: chosenBatch.qty_remaining }))
+          return
+        }
 
         const repObj = ALL_MOCK_REPS.find((r) => r.name === targetRep)
 

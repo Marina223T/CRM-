@@ -188,6 +188,11 @@ export function approveSalesOrder(orderId: string, actor: string) {
     throw new Error('Sales order was not found.')
   }
 
+  // Prevent duplicate stock deductions when an approval action is repeated
+  if (order.status === 'Approved') {
+    return orderId
+  }
+
   if (order.status !== 'Pending') {
     throw new Error('Only pending orders can be approved.')
   }
@@ -195,24 +200,42 @@ export function approveSalesOrder(orderId: string, actor: string) {
   const batches = batchesStore.get()
   const movements = stockMovementsStore.get()
 
-  // Resumable approval: if a previous attempt already deducted stock but
-  // failed before finishing, skip straight to the remaining steps instead
-  // of failing with "movements already exist". Each phase checks for its
-  // own output, so retrying never duplicates movements or invoices.
-  const alreadyMoved = movements.some((movement) => movement.order_id === orderId)
+  // Consolidate required quantity per product line
+  const requiredQtyByProduct = new Map<string, number>()
+  for (const item of order.items) {
+    requiredQtyByProduct.set(
+      item.productName,
+      (requiredQtyByProduct.get(item.productName) ?? 0) + item.quantity,
+    )
+  }
 
-  if (!alreadyMoved) {
-    // Consolidate duplicate product lines so allocation accounts for their
-    // combined quantity against the same batch pool, then allocate FEFO.
-    const quantityByProduct = new Map<string, number>()
-    for (const item of order.items) {
-      quantityByProduct.set(
-        item.productName,
-        (quantityByProduct.get(item.productName) ?? 0) + item.quantity,
+  // Check already deducted quantities for this specific order
+  const alreadyDeductedByProduct = new Map<string, number>()
+  for (const movement of movements) {
+    if (movement.order_id === orderId && movement.type === 'sell_in') {
+      alreadyDeductedByProduct.set(
+        movement.productName,
+        (alreadyDeductedByProduct.get(movement.productName) ?? 0) + movement.quantity,
       )
     }
+  }
 
-    const allocations = [...quantityByProduct.entries()].flatMap(
+  // Compute remaining needed quantities per product.
+  // Partial movements cannot cause an order to be treated as fully processed:
+  // any unfulfilled line item must be allocated and moved.
+  const neededByProduct = new Map<string, number>()
+  for (const [productName, reqQty] of requiredQtyByProduct.entries()) {
+    const alreadyDeducted = alreadyDeductedByProduct.get(productName) ?? 0
+    const needed = Math.max(0, reqQty - alreadyDeducted)
+    if (needed > 0) {
+      neededByProduct.set(productName, needed)
+    }
+  }
+
+  // If any quantity remains to be deducted, allocate FEFO across unexpired batches.
+  // If any product lacks unexpired batch stock, allocateFefo throws and approval aborts.
+  if (neededByProduct.size > 0) {
+    const allocations = [...neededByProduct.entries()].flatMap(
       ([productName, quantity]) => allocateFefo(productName, quantity, batches, movements),
     )
 

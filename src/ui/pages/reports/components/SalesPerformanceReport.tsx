@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { SALES_PERFORMANCE_MOCK, type SalesRepBreakdown } from '../mock-data'
 import { StatusPill } from '@/ui/design-system/components/StatusPill'
 import { Avatar } from '@/ui/design-system/components/Avatar'
@@ -20,6 +21,43 @@ export function SalesPerformanceReport({ filters }: SalesPerformanceReportProps)
     return true
   })
 
+  // Dynamic summary stats aggregating from active filtered dataset
+  const summaryStats = useMemo(() => {
+    if (reps.length === 0) {
+      return [
+        { label: 'Total Revenue', value: 'EGP 0', change: '0% vs target', isPositive: false },
+        { label: 'Quota Achievement', value: '0.0%', change: 'Goal: EGP 0', isPositive: false },
+        { label: 'Average Rep Velocity', value: 'EGP 0', change: '0 active field reps', isPositive: false },
+      ]
+    }
+    const totalActual = reps.reduce((sum, r) => sum + r.actual, 0)
+    const totalTarget = reps.reduce((sum, r) => sum + r.target, 0)
+    const rate = totalTarget > 0 ? ((totalActual / totalTarget) * 100).toFixed(1) : '0.0'
+    const avgVelocity = Math.round(totalActual / reps.length)
+    const vsTargetPct = totalTarget > 0 ? (((totalActual - totalTarget) / totalTarget) * 100).toFixed(1) : '0.0'
+
+    return [
+      {
+        label: 'Total Revenue',
+        value: `EGP ${totalActual.toLocaleString('en-US')}`,
+        change: `${totalActual >= totalTarget ? '+' : ''}${vsTargetPct}% vs target`,
+        isPositive: totalActual >= totalTarget,
+      },
+      {
+        label: 'Quota Achievement',
+        value: `${rate}%`,
+        change: `Goal: EGP ${totalTarget.toLocaleString('en-US')}`,
+        isPositive: Number(rate) >= 100,
+      },
+      {
+        label: 'Average Rep Velocity',
+        value: `EGP ${avgVelocity.toLocaleString('en-US')}`,
+        change: `${reps.length} active field reps`,
+        isPositive: true,
+      },
+    ]
+  }, [reps])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 3 Stat Capsules */}
@@ -30,7 +68,7 @@ export function SalesPerformanceReport({ filters }: SalesPerformanceReportProps)
           gap: '16px',
         }}
       >
-        {SALES_PERFORMANCE_MOCK.summary.map((stat) => (
+        {summaryStats.map((stat) => (
           <div
             key={stat.label}
             className="panel"

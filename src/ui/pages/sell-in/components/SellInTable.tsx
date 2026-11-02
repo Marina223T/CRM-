@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { StatusPill } from '@/ui/design-system/components/StatusPill'
 import { EmptyState } from '@/ui/design-system/components/EmptyState'
@@ -18,6 +19,15 @@ export function SellInTable({
   const { t, lang } = useT()
   const orders = useStore(salesOrdersStore)
   const customers = useStore(customersStore)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredOrders = searchQuery.trim()
+    ? orders.filter(
+        (order) =>
+          order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          order.customerName.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : orders
 
   if (orders.length === 0) {
     return (
@@ -34,8 +44,25 @@ export function SellInTable({
 
   return (
     <div style={{ marginTop: '24px' }}>
+      <input
+        type="search"
+        placeholder={t('salesOrders.searchPlaceholder')}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '10px 14px',
+          borderRadius: '10px',
+          border: '1px solid var(--border-soft)',
+          background: 'var(--surface-raised)',
+          color: 'var(--heading-text)',
+          fontSize: '14px',
+          marginBottom: '12px',
+          boxSizing: 'border-box',
+        }}
+      />
       <div className="collection-list">
-        {orders.map((order) => {
+        {filteredOrders.map((order) => {
           const customer = customers.find((c) => c.id === order.customerId)
           const customerName = customer ? localizedName(customer, lang) : order.customerName
           const units = order.items.reduce((sum, item) => sum + item.quantity, 0)
@@ -70,6 +97,9 @@ export function SellInTable({
             </button>
           )
         })}
+        {filteredOrders.length === 0 && (
+          <EmptyState message={t('salesOrders.emptyOrders')} />
+        )}
       </div>
     </div>
   )

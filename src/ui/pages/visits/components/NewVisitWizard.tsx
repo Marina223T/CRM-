@@ -22,8 +22,9 @@ import {
   batchesStore,
   stockMovementsStore,
   addStockMovement,
-  allocateFefo,
-} from '@/data/mock/stock-movements'
+  getRepAvailableSampleStock,
+  allocateRepSampleFefo,
+} from '@/data/mock/stockDerived'
 import { visitsStore, addVisit, type StoredVisit } from '@/data/mock/visits'
 import { useStore } from '@/data/mock/store'
 import { useT } from '@/lib/i18n'
@@ -94,7 +95,10 @@ export function NewVisitWizard({
 
   const [notes, setNotes] = useState('')
   const [nextVisitDate, setNextVisitDate] = useState('')
-  const [gpsVerified] = useState(true)
+  const [gpsVerified, setGpsVerified] = useState(false)
+  const [gpsStatus, setGpsStatus] = useState<'unverified' | 'verified' | 'permission_denied' | 'unavailable'>('unverified')
+  const [gpsVerifying, setGpsVerifying] = useState(false)
+  const [gpsLocationText, setGpsLocationText] = useState<string | null>(null)
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -161,12 +165,51 @@ export function NewVisitWizard({
     ]
   }, [catalogProducts])
 
-  // Sample stock available per product
+  // Representative consistency: ensure visit records are consistent with selected doctor and rep
+  const effectiveRepName = role === 'rep' ? currentUserName : (selectedClient?.repName || currentUserName)
+
+  // Sample stock available per product for this specific representative from their buffer
   const getAvailableSampleStock = (productName: string) => {
-    const used = stockMovements
-      .filter((m) => m.productName === productName && m.type === 'sample')
-      .reduce((sum, m) => sum + m.quantity, 0)
-    return Math.max(0, 30 - used)
+    return getRepAvailableSampleStock(
+      effectiveRepName,
+      productName,
+      batchesStore.get(),
+      stockMovementsStore.get()
+    )
+  }
+
+  const handleVerifyGps = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsStatus('unavailable')
+      setGpsVerified(false)
+      setErrorMsg('Geolocation service is unavailable.')
+      return
+    }
+    setGpsVerifying(true)
+    setErrorMsg(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsVerifying(false)
+        setGpsVerified(true)
+        setGpsStatus('verified')
+        const lat = pos.coords.latitude.toFixed(4)
+        const lng = pos.coords.longitude.toFixed(4)
+        // Record device coordinates without falsely asserting doctor proximity distance check
+        setGpsLocationText(`GPS (${lat}°, ${lng}°)`)
+      },
+      (err) => {
+        setGpsVerifying(false)
+        setGpsVerified(false)
+        if (err.code === 1) { // PERMISSION_DENIED
+          setGpsStatus('permission_denied')
+          setErrorMsg('Location permission denied by user.')
+        } else {
+          setGpsStatus('unavailable')
+          setErrorMsg('Location unavailable or timed out.')
+        }
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    )
   }
 
   const steps = [
@@ -231,20 +274,41 @@ export function NewVisitWizard({
       const firstReactionKey = reactions[firstProduct] || 'interested'
       const matchedReaction = reactionOptions.find((r) => r.id === firstReactionKey) || reactionOptions[0]
 
-      // 1. Allocate every sample quantity up front (pure computation, no
-      // writes). If any product lacks unexpired stock the save fails
-      // cleanly with nothing persisted, so retrying is always safe.
+      // 1. Verify sample availability per representative: prevent distributing more
+      // samples than available in the representative's transferred stock buffer.
+      for (const p of selectedProducts) {
+        const qty = samples[p] || 0
+        if (qty > 0) {
+          const avail = getAvailableSampleStock(p)
+          if (qty > avail) {
+            setErrorMsg(
+              `Cannot distribute ${qty} units of ${p}. Only ${avail} units available in representative buffer.`
+            )
+            setIsSaving(false)
+            return
+          }
+        }
+      }
+
+      // 2. Allocate every sample quantity from the representative's buffer
+      // FEFO-sorted batches. If any allocation fails, nothing is persisted.
       const sampleAllocations = selectedProducts.flatMap((p) => {
         const qty = samples[p] || 0
         if (qty <= 0) return []
-        return allocateFefo(p, qty, batchesStore.get(), stockMovementsStore.get())
+        return allocateRepSampleFefo(
+          effectiveRepName,
+          p,
+          qty,
+          batchesStore.get(),
+          stockMovementsStore.get()
+        )
       })
 
-      // 2. Add visit to visitsStore
+      // 3. Add visit to visitsStore with consistent representative and actual GPS verification
       const newVisit: StoredVisit = addVisit({
         clientName: selectedClient.name,
         clientName_ar: selectedClient.name_ar,
-        repName: currentUserName,
+        repName: effectiveRepName,
         date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         detail: t('visits.new.presentation', { products: selectedProducts.slice(0, 2).join(' & ') }),
@@ -255,11 +319,10 @@ export function NewVisitWizard({
         reactionLabel: matchedReaction.label,
         notes: notes.trim() || t('visits.new.defaultNote'),
         nextVisitDate: formatDisplayDate(nextVisitDate || addDaysToDate(14)),
-        gpsVerified: true,
+        gpsVerified: gpsVerified,
       })
 
-      // 3. Record the pre-allocated sample movements, FEFO-allocated across
-      // each product's non-expired batches (single source of derived stock).
+      // 4. Record the pre-allocated sample movements against the representative's custody
       sampleAllocations.forEach((allocation) => {
         addStockMovement({
           productName: allocation.productName,
@@ -270,7 +333,7 @@ export function NewVisitWizard({
           date: today,
           customer_id: selectedClient.id ?? undefined,
           customerName: selectedClient.name,
-          repName: currentUserName,
+          repName: effectiveRepName,
         })
       })
 
@@ -298,6 +361,9 @@ export function NewVisitWizard({
     setSamples({})
     setNotes('')
     setNextVisitDate('')
+    setGpsVerified(false)
+    setGpsStatus('unverified')
+    setGpsLocationText(null)
     setSavedVisitId(null)
     setErrorMsg(null)
   }
@@ -624,8 +690,8 @@ export function NewVisitWizard({
         {/* Step 4: Notes & Scheduling */}
         {currentStep === 4 && (
           <div style={{ flex: 1, overflowY: 'auto', maxHeight: '60vh', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* GPS Verified Badge */}
-            {gpsVerified && (
+            {/* GPS Location Verification */}
+            {gpsStatus === 'verified' ? (
               <div
                 style={{
                   display: 'flex',
@@ -641,7 +707,41 @@ export function NewVisitWizard({
                 }}
               >
                 <MapPin size={16} />
-                <span>{t('visits.new.gpsVerified')}</span>
+                <span>{gpsLocationText ? `Coordinates Logged • ${gpsLocationText}` : t('visits.new.gpsVerified')}</span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  background: 'var(--surface-raised, rgba(0,0,0,0.03))',
+                  border: '1px solid var(--border-soft)',
+                  fontSize: '13px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--muted-text)' }}>
+                  <MapPin size={16} />
+                  <span>
+                    {gpsStatus === 'permission_denied'
+                      ? 'GPS Permission Denied'
+                      : gpsStatus === 'unavailable'
+                      ? 'GPS Unavailable'
+                      : t('visits.detail.standardLog')}
+                  </span>
+                </div>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={handleVerifyGps}
+                  disabled={gpsVerifying}
+                  style={{ height: '30px', padding: '0 12px', fontSize: '12px' }}
+                >
+                  {gpsVerifying ? 'Verifying...' : 'Capture GPS'}
+                </Button>
               </div>
             )}
 
@@ -746,7 +846,14 @@ export function NewVisitWizard({
                 <strong>{t('visits.new.summaryNextVisit')}</strong> {formatDisplayDate(nextVisitDate)}
               </div>
               <div>
-                <strong>{t('visits.new.summaryGps')}</strong> {t('visits.new.verified')}
+                <strong>{t('visits.new.summaryGps')}</strong>{' '}
+                {gpsStatus === 'verified'
+                  ? t('visits.new.verified')
+                  : gpsStatus === 'permission_denied'
+                  ? 'Permission Denied'
+                  : gpsStatus === 'unavailable'
+                  ? 'Location Unavailable'
+                  : t('visits.detail.standardLog')}
               </div>
             </div>
 

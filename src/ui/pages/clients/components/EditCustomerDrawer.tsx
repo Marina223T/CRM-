@@ -45,6 +45,19 @@ function EditCustomerDrawerInner({
   // Form states
   const [name, setName] = useState(customer.name || '')
   const [nameAr, setNameAr] = useState(customer.name_ar || '')
+  const [clientCategory, setClientCategory] = useState<'hcp' | 'hco'>(
+    customer.clientCategory || (customer.type === 'pharmacy' ? 'hco' : 'hcp')
+  )
+  const [hcpType, setHcpType] = useState<'doctor' | 'pharmacist' | 'other'>(
+    customer.hcpType || (customer.type === 'pharmacy' ? 'pharmacist' : 'doctor')
+  )
+  const [hcoType, setHcoType] = useState<'hospital' | 'clinic' | 'medical_center' | 'pharmacy' | 'other'>(
+    customer.hcoType || (customer.type === 'pharmacy' ? 'pharmacy' : 'clinic')
+  )
+  const [relationshipStatus, setRelationshipStatus] = useState(
+    customer.relationshipStatus || 'Regular'
+  )
+  const [statusVal, setStatusVal] = useState(customer.status || 'Active')
   const [specialty, setSpecialty] = useState(customer.specialty || 'General Medicine')
   const [classification, setClassification] = useState(
     customer.classification?.startsWith('Class') ? customer.classification : `Class ${customer.classification || 'A'}`
@@ -123,6 +136,11 @@ function EditCustomerDrawerInner({
       ...customer,
       name: name.trim(),
       name_ar: nameAr.trim() || undefined,
+      clientCategory,
+      hcpType: clientCategory === 'hcp' ? hcpType : undefined,
+      hcoType: clientCategory === 'hco' ? hcoType : undefined,
+      relationshipStatus: clientCategory === 'hcp' ? relationshipStatus : undefined,
+      status: statusVal,
       specialty,
       classification,
       region,
@@ -131,8 +149,7 @@ function EditCustomerDrawerInner({
       repName: assignedRepName,
       rep_id: assignedRepId,
       notes: notes.trim(),
-      active,
-      status: active ? (customer.status === 'Overdue' ? 'Overdue' : 'Active') : 'Inactive',
+      active: statusVal !== 'Inactive',
       meta: `${specialty} · ${region} · ${classification}`,
     }
 
@@ -231,6 +248,82 @@ function EditCustomerDrawerInner({
                 dir="rtl"
                 disabled={!isOwnCustomer}
               />
+            </label>
+
+            {/* Client Category: HCP vs HCO */}
+            <label>
+              {lang === 'ar' ? 'فئة العميل' : 'Client Category'}
+              <select
+                value={clientCategory}
+                onChange={(e) => setClientCategory(e.target.value as 'hcp' | 'hco')}
+                disabled={!isOwnCustomer}
+              >
+                <option value="hcp">{lang === 'ar' ? 'مهني صحي (HCP)' : 'Healthcare Professional (HCP)'}</option>
+                <option value="hco">{lang === 'ar' ? 'مؤسسة صحية (HCO)' : 'Healthcare Organization (HCO)'}</option>
+              </select>
+            </label>
+
+            {/* Sub-type depending on HCP or HCO */}
+            {clientCategory === 'hcp' ? (
+              <label>
+                {lang === 'ar' ? 'نوع المهني' : 'HCP Professional Type'}
+                <select
+                  value={hcpType}
+                  onChange={(e) => setHcpType(e.target.value as 'doctor' | 'pharmacist' | 'other')}
+                  disabled={!isOwnCustomer}
+                >
+                  <option value="doctor">{lang === 'ar' ? 'طبيب' : 'Doctor'}</option>
+                  <option value="pharmacist">{lang === 'ar' ? 'صيدلي' : 'Pharmacist'}</option>
+                  <option value="other">{lang === 'ar' ? 'أخصائي رعاية صحية آخر' : 'Other Healthcare Professional'}</option>
+                </select>
+              </label>
+            ) : (
+              <label>
+                {lang === 'ar' ? 'نوع المؤسسة' : 'HCO Organization Type'}
+                <select
+                  value={hcoType}
+                  onChange={(e) => setHcoType(e.target.value as 'hospital' | 'clinic' | 'medical_center' | 'pharmacy' | 'other')}
+                  disabled={!isOwnCustomer}
+                >
+                  <option value="hospital">{lang === 'ar' ? 'مستشفى' : 'Hospital'}</option>
+                  <option value="clinic">{lang === 'ar' ? 'عيادة' : 'Clinic'}</option>
+                  <option value="medical_center">{lang === 'ar' ? 'مركز طبي' : 'Medical Center'}</option>
+                  <option value="pharmacy">{lang === 'ar' ? 'صيدلية' : 'Pharmacy'}</option>
+                  <option value="other">{lang === 'ar' ? 'مؤسسة أخرى' : 'Other Institution'}</option>
+                </select>
+              </label>
+            )}
+
+            {/* Relationship Status for HCPs */}
+            {clientCategory === 'hcp' && (
+              <label>
+                {lang === 'ar' ? 'حالة العلاقة' : 'Relationship Status'}
+                <select
+                  value={relationshipStatus}
+                  onChange={(e) => setRelationshipStatus(e.target.value)}
+                  disabled={!isOwnCustomer}
+                >
+                  <option value="Key Opinion Leader">{lang === 'ar' ? 'قائد رأي رئيسي (KOL)' : 'Key Opinion Leader (KOL)'}</option>
+                  <option value="Regular">{lang === 'ar' ? 'عميل منتظم' : 'Regular'}</option>
+                  <option value="Advocate">{lang === 'ar' ? 'مناصر وداعم' : 'Advocate'}</option>
+                  <option value="Prospect">{lang === 'ar' ? 'عميل محتمل' : 'Prospect'}</option>
+                </select>
+              </label>
+            )}
+
+            {/* Account Status */}
+            <label>
+              {lang === 'ar' ? 'حالة الحساب' : 'Account Status'}
+              <select
+                value={statusVal}
+                onChange={(e) => setStatusVal(e.target.value)}
+                disabled={!isOwnCustomer}
+              >
+                <option value="Active">{lang === 'ar' ? 'نشط (Active)' : 'Active'}</option>
+                <option value="Inactive">{lang === 'ar' ? 'غير نشط (Inactive)' : 'Inactive'}</option>
+                <option value="Pending">{lang === 'ar' ? 'قيد الانتظار (Pending)' : 'Pending'}</option>
+                <option value="Overdue">{lang === 'ar' ? 'متأخر للزيارة (Overdue)' : 'Overdue'}</option>
+              </select>
             </label>
 
             {/* Specialty */}

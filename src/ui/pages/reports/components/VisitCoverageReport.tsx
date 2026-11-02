@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { AlertCircle, Calendar, Clock, Stethoscope } from 'lucide-react'
 import { VISIT_COVERAGE_MOCK, type OverdueDoctor } from '../mock-data'
 import { StatusPill } from '@/ui/design-system/components/StatusPill'
@@ -25,6 +26,40 @@ export function VisitCoverageReport({ filters }: VisitCoverageReportProps) {
     return true
   })
 
+  const summaryStats = useMemo(() => {
+    if (repCoverage.length === 0) {
+      return [
+        { label: 'Target Coverage', value: '0.0%', change: '0 visits reached', isPositive: false },
+        { label: 'Overdue Doctors', value: `${overdueDocs.length} accounts`, change: 'Exceeding cycle interval', isPositive: overdueDocs.length === 0 },
+        { label: 'Total Visits Logged', value: '0 visits', change: '0 field reps', isPositive: false },
+      ]
+    }
+    const totalPlanned = repCoverage.reduce((sum, r) => sum + r.planned, 0)
+    const totalCompleted = repCoverage.reduce((sum, r) => sum + r.completed, 0)
+    const covRate = totalPlanned > 0 ? ((totalCompleted / totalPlanned) * 100).toFixed(1) : '0.0'
+
+    return [
+      {
+        label: 'Target Coverage',
+        value: `${covRate}%`,
+        change: `${totalCompleted} of ${totalPlanned} doctors reached`,
+        isPositive: Number(covRate) >= 85,
+      },
+      {
+        label: 'Overdue Doctors',
+        value: `${overdueDocs.length} accounts`,
+        change: 'Exceeding cycle interval',
+        isPositive: overdueDocs.length === 0,
+      },
+      {
+        label: 'Total Visits Logged',
+        value: `${totalCompleted} visits`,
+        change: `${repCoverage.length} active field reps`,
+        isPositive: totalCompleted > 0,
+      },
+    ]
+  }, [repCoverage, overdueDocs])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 3 Summary Capsules */}
@@ -35,7 +70,7 @@ export function VisitCoverageReport({ filters }: VisitCoverageReportProps) {
           gap: '16px',
         }}
       >
-        {VISIT_COVERAGE_MOCK.summary.map((stat) => (
+        {summaryStats.map((stat) => (
           <div
             key={stat.label}
             className="panel"

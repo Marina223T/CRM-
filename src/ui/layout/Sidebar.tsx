@@ -5,7 +5,7 @@ import type { ElementType } from 'react'
 import {
   Activity, ArrowUpRight, BarChart2, CalendarDays, ChevronLeft, ChevronRight,
   ClipboardCheck, FileText, LayoutGrid, MapPin, Package,
-  Power, Settings2, Shield, Stethoscope, Target, User, Users,
+  Power, RotateCcw, Settings2, Shield, Stethoscope, Target, User, Users, Wallet,
 } from 'lucide-react'
 import { canAccessPage, type User as AuthUser } from '@/lib/auth'
 import { storedUsersStore } from '@/lib/auth/mock-users'
@@ -20,9 +20,11 @@ const NAV_LABEL_MAP: Record<string, TranslationKey> = {
   'Stock': 'nav.stock',
   'Sell-in': 'nav.sellIn',
   'Sell-out': 'nav.sellOut',
+  'Returns': 'nav.returns',
   'Targets': 'nav.targets',
   'Visits': 'nav.visits',
   'Visit plan': 'nav.visitPlan',
+  'Budgets': 'nav.budgets',
   'Reports': 'nav.reports',
   'Admin': 'nav.admin',
   'Users': 'nav.users',
@@ -79,9 +81,11 @@ export function Sidebar({
     { label: 'Stock', activeKey: 'Stock', icon: Package },
     { label: 'Sell-in', activeKey: 'Sell-in', icon: ArrowUpRight },
     { label: 'Sell-out', activeKey: 'Sell-out', icon: Activity },
+    { label: 'Returns', activeKey: 'Returns', icon: RotateCcw },
     { label: 'Targets', activeKey: 'Targets', icon: Target },
     { label: 'Visits', activeKey: 'Visits', icon: Stethoscope },
     { label: 'Visit plan', activeKey: 'Visit plan', icon: CalendarDays },
+    { label: 'Budgets', activeKey: 'Budgets', icon: Wallet },
   ]
 
   // Admin-only items

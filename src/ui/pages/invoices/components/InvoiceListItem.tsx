@@ -27,6 +27,11 @@ export function InvoiceListItem({ item, onClick }: InvoiceListItemProps) {
       <div>
         <strong>{displayName}</strong>
         <span>{displayMeta}</span>
+        {item.status === 'Rejected' && (item as any).rejection_reason && (
+          <span style={{ color: 'var(--rose-text, #dc2626)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+            {(item as any).rejection_reason}
+          </span>
+        )}
       </div>
       <StatusPill status={item.status} />
       <ChevronRight />

@@ -7,9 +7,11 @@ export const ALL_STANDARD_PAGES = [
   'Stock',
   'Sell-in',
   'Sell-out',
+  'Returns',
   'Targets',
   'Visits',
   'Visit plan',
+  'Budgets',
   'Reports',
 ]
 

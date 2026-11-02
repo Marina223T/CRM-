@@ -154,6 +154,10 @@ export function RecordFormDrawer({
         region: docRegion,
         repName: repToSave.name,
         rep_id: repToSave.id,
+        phone: docPhone.trim() || undefined,
+        clientCategory: 'hcp' as const,
+        hcpType: docSpecialty === 'Pharmacy' ? ('pharmacist' as const) : ('doctor' as const),
+        relationshipStatus: 'Regular',
       }
 
       addCustomer(newCustomer)

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { SELL_IN_OUT_MOCK, type ProductSellThrough } from '../mock-data'
 import { StatusPill } from '@/ui/design-system/components/StatusPill'
@@ -17,6 +18,45 @@ export function SellInVsSellOutReport({ filters }: SellInVsSellOutReportProps) {
     if (filters.products.length > 0 && !filters.products.includes(p.product)) return false
     return true
   })
+
+  // Dynamic summary stats reflecting active product filter
+  const summaryStats = useMemo(() => {
+    if (products.length === 0) {
+      return [
+        { label: 'Total Sell-In', value: '0 units', change: '0 packs ordered', isPositive: false },
+        { label: 'Total Sell-Out', value: '0 units', change: '0 packs dispensed', isPositive: false },
+        { label: 'Sell-Through Ratio', value: '0.0%', change: 'Optimal threshold: 75%+', isPositive: false },
+      ]
+    }
+    const totalSellInUnits = products.reduce((sum, p) => sum + p.sellInUnits, 0)
+    const totalSellOutUnits = products.reduce((sum, p) => sum + p.sellOutUnits, 0)
+    const rate = totalSellInUnits > 0 ? ((totalSellOutUnits / totalSellInUnits) * 100).toFixed(1) : '0.0'
+
+    if (products.length === SELL_IN_OUT_MOCK.products.length) {
+      return SELL_IN_OUT_MOCK.summary
+    }
+
+    return [
+      {
+        label: 'Total Sell-In',
+        value: `${totalSellInUnits.toLocaleString('en-US')} units`,
+        change: `${totalSellInUnits.toLocaleString('en-US')} packs ordered`,
+        isPositive: true,
+      },
+      {
+        label: 'Total Sell-Out',
+        value: `${totalSellOutUnits.toLocaleString('en-US')} units`,
+        change: `${totalSellOutUnits.toLocaleString('en-US')} packs dispensed`,
+        isPositive: true,
+      },
+      {
+        label: 'Sell-Through Ratio',
+        value: `${rate}%`,
+        change: 'Optimal threshold: 75%+',
+        isPositive: Number(rate) >= 75,
+      },
+    ]
+  }, [products])
 
   // SVG Area Chart points calculation
   const months = SELL_IN_OUT_MOCK.monthlyTrend
@@ -54,7 +94,7 @@ export function SellInVsSellOutReport({ filters }: SellInVsSellOutReportProps) {
           gap: '16px',
         }}
       >
-        {SELL_IN_OUT_MOCK.summary.map((stat) => (
+        {summaryStats.map((stat) => (
           <div
             key={stat.label}
             className="panel"
