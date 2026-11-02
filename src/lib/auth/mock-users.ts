@@ -43,6 +43,30 @@ export const MOCK_USERS: MockUserRecord[] = [
     permissions: getDefaultPermissions('rep'),
     passwordHash: 'Rep123!',
   },
+  {
+    id: 'u-rep-olivia',
+    name: 'Olivia Martin',
+    name_ar: 'أوليفيا مارتن',
+    email: 'olivia.martin@navigenpharma.net',
+    role: 'rep',
+    region: 'North region',
+    status: 'active',
+    emailVerified: true,
+    permissions: getDefaultPermissions('rep'),
+    passwordHash: 'Rep123!',
+  },
+  {
+    id: 'u-rep-maya',
+    name: 'Maya Patel',
+    name_ar: 'مايا باتيل',
+    email: 'maya.patel@navigenpharma.net',
+    role: 'rep',
+    region: 'West region',
+    status: 'active',
+    emailVerified: true,
+    permissions: getDefaultPermissions('rep'),
+    passwordHash: 'Rep123!',
+  },
 ]
 
 export const INITIAL_STORED_USERS: MockUserRecord[] = [
@@ -96,9 +120,42 @@ export function getPendingUsersCount(): number {
   return getStoredUsers().filter((u) => u.status === 'pending').length
 }
 
-/** Get all users (built-in + stored) */
+export const userOverridesStore = createStore<Record<string, Partial<MockUserRecord>>>('user_overrides', {})
+
+/** Persist administrative overrides for a user across sessions */
+export function saveUserOverride(identifier: string, updates: Partial<MockUserRecord>): void {
+  const key = identifier.trim().toLowerCase()
+  userOverridesStore.update((curr) => {
+    const existing = curr[key] || {}
+    return {
+      ...curr,
+      [key]: {
+        ...existing,
+        ...updates,
+        permissions: updates.permissions ? { ...updates.permissions } : existing.permissions,
+      },
+    }
+  })
+}
+
+/** Get all users (built-in + stored) merged with persisted overrides */
 export function getAllUsers(): MockUserRecord[] {
-  return [...MOCK_USERS, ...getStoredUsers()]
+  const overrides = userOverridesStore.get()
+  const rawList = [...MOCK_USERS, ...getStoredUsers()]
+  return rawList.map((user) => {
+    const idOverride = user.id ? overrides[user.id.toLowerCase()] : undefined
+    const emailOverride = user.email ? overrides[user.email.toLowerCase()] : undefined
+    const combinedOverride = { ...(idOverride || {}), ...(emailOverride || {}) }
+
+    if (Object.keys(combinedOverride).length > 0) {
+      return {
+        ...user,
+        ...combinedOverride,
+        permissions: combinedOverride.permissions ? { ...combinedOverride.permissions } : user.permissions,
+      }
+    }
+    return user
+  })
 }
 
 /** Find a user by email across built-in + stored */
@@ -109,14 +166,16 @@ export function findUserByEmail(email: string): MockUserRecord | undefined {
 
 /** Update a stored user record (for email verification etc.) */
 export function updateStoredUser(email: string, updates: Partial<MockUserRecord>): void {
+  const clean = email.trim().toLowerCase()
+  saveUserOverride(clean, updates)
   const stored = getStoredUsers()
-  const idx = stored.findIndex((u) => u.email.toLowerCase() === email.trim().toLowerCase())
+  const idx = stored.findIndex((u) => u.email.toLowerCase() === clean)
   if (idx !== -1) {
     stored[idx] = { ...stored[idx], ...updates }
     saveStoredUsers(stored)
   }
   // Also update built-in mock users in memory
-  const builtIn = MOCK_USERS.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
+  const builtIn = MOCK_USERS.find((u) => u.email.toLowerCase() === clean)
   if (builtIn) {
     Object.assign(builtIn, updates)
   }

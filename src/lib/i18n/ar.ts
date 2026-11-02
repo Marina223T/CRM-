@@ -21,6 +21,7 @@ export const ar: Partial<Record<TranslationKey, string>> = {
   'nav.settings': 'الإعدادات',
   'nav.scorecard': 'بطاقة الأداء',
   'nav.profile': 'الملف الشخصي',
+  'nav.more': 'المزيد',
   'nav.logout': 'تسجيل الخروج',
 
   // Header

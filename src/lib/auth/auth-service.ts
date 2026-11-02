@@ -1,4 +1,4 @@
-import { MOCK_USERS, findUserByEmail, getStoredUsers, saveStoredUsers, updateStoredUser } from './mock-users'
+import { MOCK_USERS, findUserByEmail, getStoredUsers, saveStoredUsers, updateStoredUser, saveUserOverride } from './mock-users'
 import type { User, AuthSession, UserStatus } from './types'
 import { getDefaultPermissions } from './permissions'
 
@@ -200,16 +200,34 @@ export function setSessionUser(user: User): void {
 }
 
 export function updateMockUser(updatedUser: Partial<User> & { id?: string; email?: string }): void {
+  const cleanEmail = updatedUser.email?.trim().toLowerCase()
+  const userId = updatedUser.id
+
+  if (userId) {
+    saveUserOverride(userId, updatedUser)
+  }
+  if (cleanEmail) {
+    saveUserOverride(cleanEmail, updatedUser)
+  }
+
   const found = MOCK_USERS.find(
-    (u) => (updatedUser.id && u.id === updatedUser.id) || (updatedUser.email && u.email.toLowerCase() === updatedUser.email.toLowerCase())
+    (u) => (userId && u.id === userId) || (cleanEmail && u.email.toLowerCase() === cleanEmail)
   )
   if (found) {
     Object.assign(found, updatedUser)
   }
 
   const session = getSession()
-  if (session?.user && ((updatedUser.id && session.user.id === updatedUser.id) || (updatedUser.email && session.user.email.toLowerCase() === updatedUser.email.toLowerCase()))) {
-    const newSessionUser = { ...session.user, ...updatedUser } as User
+  if (
+    session?.user &&
+    ((userId && session.user.id === userId) ||
+      (cleanEmail && session.user.email.toLowerCase() === cleanEmail))
+  ) {
+    const newSessionUser = {
+      ...session.user,
+      ...updatedUser,
+      permissions: updatedUser.permissions ? { ...updatedUser.permissions } : session.user.permissions,
+    } as User
     setSessionUser(newSessionUser)
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('navigen_user_updated', { detail: newSessionUser }))

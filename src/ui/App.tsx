@@ -76,6 +76,19 @@ function AppContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, navStack])
 
+  // Redirect to Home if the current page becomes unauthorized (e.g. after admin permission change)
+  useEffect(() => {
+    if (!user) return
+    const unguardedPages = new Set(['Home', 'Profile', 'More', 'Login', 'Settings'])
+    if (unguardedPages.has(active)) return
+    if (!canAccessPage(active, role, user)) {
+      setNotice(t('app.toastNoPageAccess'))
+      window.setTimeout(() => setNotice(''), 2600)
+      setActive('Home')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, user, role])
+
   const action = (message: string) => {
     setNotice(message)
     window.setTimeout(() => setNotice(''), 2600)
@@ -228,7 +241,7 @@ function AppContent() {
               onSelectRep={(repName) => navigateTo('Visits', { filter: repName })}
             />
           )}
-          {active === 'Clients' && (
+          {active === 'Clients' && canAccessPage('Clients', role, user) && (
             <ClientsPage
               onAdd={() => open('add doctor')}
               onItem={(client) => {
@@ -241,7 +254,7 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Invoices' && (
+          {active === 'Invoices' && canAccessPage('Invoices', role, user) && (
             <InvoicesPage
               onAdd={() => open('upload invoice')}
               onItem={(invoice) => openInvoiceDetail(invoice.name)}
@@ -251,7 +264,7 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Stock' && (
+          {active === 'Stock' && canAccessPage('Stock', role, user) && (
             <StockPage
               onAdd={() => open('add product')}
               onItem={() => open('stock detail')}
@@ -262,11 +275,11 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Sell-in' && <SellInPage onAction={action} />}
-          {active === 'Sell-out' && <SellOutPage />}
-          {active === 'Returns' && <ReturnsPage onAction={action} />}
-          {active === 'Targets' && <TargetsPage />}
-          {active === 'Visits' && (
+          {active === 'Sell-in' && canAccessPage('Sell-in', role, user) && <SellInPage onAction={action} />}
+          {active === 'Sell-out' && canAccessPage('Sell-out', role, user) && <SellOutPage />}
+          {active === 'Returns' && canAccessPage('Returns', role, user) && <ReturnsPage onAction={action} />}
+          {active === 'Targets' && canAccessPage('Targets', role, user) && <TargetsPage />}
+          {active === 'Visits' && canAccessPage('Visits', role, user) && (
             <VisitsPage
               onNewVisit={() => open('new visit')}
               filterRep={pageFilter['Visits']}
@@ -275,13 +288,13 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Visit plan' && (
+          {active === 'Visit plan' && canAccessPage('Visit plan', role, user) && (
             <VisitPlanPage role={role} currentUserName={currentUserName} />
           )}
-          {active === 'Budgets' && (
+          {active === 'Budgets' && canAccessPage('Budgets', role, user) && (
             <BudgetsPage role={role} currentUserName={currentUserName} />
           )}
-          {active === 'Reports' && (
+          {active === 'Reports' && canAccessPage('Reports', role, user) && (
             <ReportsPage
               role={role}
               currentUserName={currentUserName}
@@ -345,7 +358,7 @@ function AppContent() {
       />
 
       {/* Mobile Bottom Navigation (<768px) */}
-      <BottomDock active={profileOpen ? 'More' : active} onSelect={selectNav} />
+      <BottomDock active={profileOpen ? 'More' : active} onSelect={selectNav} user={user} role={role} />
 
       {/* Floating Feedback Toast */}
       {notice && <Toast message={notice} />}

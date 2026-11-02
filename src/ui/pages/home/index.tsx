@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Users, Clock3, FileText, Stethoscope } from 'lucide-react'
 import { Button } from '@/ui/design-system/components/Button'
-import { useAuth } from '@/lib/auth'
+import { useAuth, canAccessPage } from '@/lib/auth'
 import { storedUsersStore } from '@/lib/auth/mock-users'
 import { useStore } from '@/data/mock/store'
 import { batchesStore, stockMovementsStore, getBatchesNearExpiry } from '@/data/mock/stockDerived'
@@ -126,9 +126,21 @@ export default function HomePage({
   const firstExpiringBatch = expiringBatchesList[0]
 
   const dynamicAttentionItems = [
-    { icon: FileText, label: t('home.attention.invoices'), count: '5', tone: 'amber' as const, detail: t('home.attention.invoicesDetail') },
-    { icon: Stethoscope, label: t('home.attention.doctors'), count: '3', tone: 'rose' as const, detail: t('home.attention.doctorsDetail') },
-    {
+    canAccessPage('Invoices', role, user) && {
+      icon: FileText,
+      label: t('home.attention.invoices'),
+      count: '5',
+      tone: 'amber' as const,
+      detail: t('home.attention.invoicesDetail'),
+    },
+    canAccessPage('Clients', role, user) && {
+      icon: Stethoscope,
+      label: t('home.attention.doctors'),
+      count: '3',
+      tone: 'rose' as const,
+      detail: t('home.attention.doctorsDetail'),
+    },
+    canAccessPage('Stock', role, user) && {
       icon: Clock3,
       label: t('home.attention.batchExpiring'),
       count: String(expiringBatchesList.length),
@@ -137,7 +149,19 @@ export default function HomePage({
         ? t('home.attention.batchExpiringDetail', { product: firstExpiringBatch.productName, days: firstExpiringBatch.days_to_expiry })
         : t('home.attention.allBatchesHealthy'),
     },
-  ]
+  ].filter(Boolean) as typeof homeAttentionItems
+
+  const handleNav = (page: string, options?: { filter?: string; overlay?: string }) => {
+    if (onNavigateWithFilter) {
+      onNavigateWithFilter(page, options)
+    } else {
+      if (!canAccessPage(page, role, user)) {
+        onAction(t('app.toastNoPageAccess'))
+        return
+      }
+      setActive(page)
+    }
+  }
 
   return (
     <section className="content">
@@ -220,7 +244,7 @@ export default function HomePage({
 
       <AttentionSection
         items={
-          role === 'admin' && pendingCount > 0
+          role === 'admin' && canAccessPage('Users', role, user) && pendingCount > 0
             ? [
                 {
                   icon: Users,
@@ -239,14 +263,14 @@ export default function HomePage({
       />
 
       <div className="bento-grid">
-        <SellInChartPanel onClick={() => setActive('Sell-in')} />
+        <SellInChartPanel onClick={() => handleNav('Sell-in')} />
         <TargetPanel />
         <ProductsPanel
-          onNavigateStock={() => setActive('Stock')}
+          onNavigateStock={() => handleNav('Stock')}
           onOpenStockDetail={() => onOpen('stock detail')}
         />
         <TopRepsPanel
-          onNavigateMore={() => setActive('More')}
+          onNavigateMore={() => handleNav('More')}
           onAction={onAction}
           onSelectRep={onSelectRep}
         />

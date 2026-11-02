@@ -19,6 +19,7 @@ export const en = {
   'nav.settings': 'Settings',
   'nav.scorecard': 'My scorecard',
   'nav.profile': 'My profile',
+  'nav.more': 'More',
   'nav.logout': 'Log out',
 
   // Header
