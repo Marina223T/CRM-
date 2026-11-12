@@ -319,7 +319,13 @@ function AppContent() {
             />
           )}
           {active === 'Returns' && canAccessPage('Returns', role, user) && <ReturnsPage onAction={action} />}
-          {active === 'Targets' && canAccessPage('Targets', role, user) && <TargetsPage />}
+          {active === 'Targets' && canAccessPage('Targets', role, user) && (
+            <TargetsPage
+              role={role}
+              currentUserName={user?.name || 'Alex Morgan'}
+              onAction={action}
+            />
+          )}
           {active === 'Visits' && canAccessPage('Visits', role, user) && (
             <VisitsPage
               onNewVisit={() => open('new visit')}
