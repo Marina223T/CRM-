@@ -35,6 +35,7 @@ export const ar: Partial<Record<TranslationKey, string>> = {
   'invoicesSellIn.eyebrow': 'إدارة التوزيع',
   'invoicesSellIn.story': 'إدارة وتتبع أوامر بيع الموزعين ومراجعة الفواتير المعتمدة في واجهة موحدة.',
   'invoicesSellIn.tabInvoices': 'الفواتير',
+  'invoicesSellIn.tabPaid': 'الفواتير المسددة',
   'invoicesSellIn.tabSellIn': 'المبيعات المباشرة (Sell-in)',
 
   // Distribution Overview
@@ -546,6 +547,8 @@ export const ar: Partial<Record<TranslationKey, string>> = {
   'invoices.toolbar.allStatuses': 'كل الحالات',
   'invoices.toolbar.pending': 'قيد المراجعة',
   'invoices.toolbar.approved': 'تمت الموافقة',
+  'invoices.toolbar.partiallyPaid': 'مدفوع جزئياً',
+  'invoices.toolbar.paid': 'مدفوع بالكامل',
   'invoices.toolbar.rejected': 'مرفوض',
   'invoices.toolbar.allTime': 'كل الأوقات',
   'invoices.toolbar.today': 'اليوم',

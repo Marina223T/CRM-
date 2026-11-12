@@ -20,7 +20,7 @@ export interface InvoiceToolbarProps {
   onClearFilters: () => void
 }
 
-const STATUSES = ['All statuses', 'Pending', 'Approved', 'Rejected']
+const STATUSES = ['All statuses', 'Pending', 'Approved', 'Partially Paid', 'Paid', 'Rejected']
 const DATE_RANGES = ['All time', 'Today', 'Last 7 days', 'This month', 'Last month']
 const SOURCES = ['All sources', 'Telegram', 'Web upload', 'Sales order']
 
@@ -28,6 +28,8 @@ export const STATUS_KEYS: Record<string, string> = {
   'All statuses': 'invoices.toolbar.allStatuses',
   'Pending': 'invoices.toolbar.pending',
   'Approved': 'invoices.toolbar.approved',
+  'Partially Paid': 'invoices.toolbar.partiallyPaid',
+  'Paid': 'invoices.toolbar.paid',
   'Rejected': 'invoices.toolbar.rejected',
 }
 

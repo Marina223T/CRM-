@@ -33,6 +33,7 @@ export const en = {
   'invoicesSellIn.eyebrow': 'Distribution Management',
   'invoicesSellIn.story': 'Manage incoming distributor sales orders and review validated invoice submissions in one unified workspace.',
   'invoicesSellIn.tabInvoices': 'Invoices',
+  'invoicesSellIn.tabPaid': 'Paid Invoices',
   'invoicesSellIn.tabSellIn': 'Sell-in',
 
   // Distribution Overview
@@ -544,6 +545,8 @@ export const en = {
   'invoices.toolbar.allStatuses': 'All statuses',
   'invoices.toolbar.pending': 'Pending',
   'invoices.toolbar.approved': 'Approved',
+  'invoices.toolbar.partiallyPaid': 'Partially Paid',
+  'invoices.toolbar.paid': 'Paid',
   'invoices.toolbar.rejected': 'Rejected',
   'invoices.toolbar.allTime': 'All time',
   'invoices.toolbar.today': 'Today',
