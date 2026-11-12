@@ -16,6 +16,9 @@ export type StoredInvoice = InvoiceRecord & {
   order_id?: string
   rejection_reason?: string
   approval_history?: ApprovalHistoryEntry[]
+  paidAmount?: number
+  remainingBalance?: number
+  paymentStatus?: string
 }
 
 export const invoicesStore = createStore<StoredInvoice[]>('invoices', invoicesMockData as StoredInvoice[])
@@ -27,7 +30,7 @@ export function generateInvoiceName(customerName: string): string {
   const max = invoicesStore.get().reduce((latest, invoice) => {
     const match = invoice.name.match(/INV-(\d+)/)
     return match ? Math.max(latest, Number(match[1])) : latest
-  }, 1040)
+  }, 1050)
   return `INV-${max + 1} · ${customerName}`
 }
 

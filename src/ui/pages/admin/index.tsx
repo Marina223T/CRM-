@@ -12,9 +12,24 @@ import AdminSettingsPage from './settings'
 export interface AdminPageProps {
   initialSubpage?: string
   filter?: string | null
+  currentUserName?: string
+  currentUserEmail?: string
+  role?: 'admin' | 'rep'
+  dark?: boolean
+  onToggleDark?: () => void
+  onAction?: (msg: string) => void
 }
 
-export default function AdminPage({ initialSubpage, filter }: AdminPageProps) {
+export default function AdminPage({
+  initialSubpage,
+  filter,
+  currentUserName = 'Alex Morgan',
+  currentUserEmail = 'alex.morgan@navigen.eg',
+  role = 'admin',
+  dark = false,
+  onToggleDark,
+  onAction,
+}: AdminPageProps) {
   const { t } = useT()
   const [selected, setSelected] = useState<string | null>(initialSubpage || null)
 
@@ -82,7 +97,14 @@ export default function AdminPage({ initialSubpage, filter }: AdminPageProps) {
             <ArrowLeft /> {t('admin.backToAdmin')}
           </Button>
         </div>
-        <AdminSettingsPage />
+        <AdminSettingsPage
+          currentUserName={currentUserName}
+          currentUserEmail={currentUserEmail}
+          role={role}
+          dark={dark}
+          onToggleDark={onToggleDark}
+          onAction={onAction}
+        />
       </div>
     )
   }

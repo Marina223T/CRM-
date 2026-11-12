@@ -4,6 +4,8 @@ import { ArrowLeft, Bell, Moon, Search, Sun } from 'lucide-react'
 import { useGreeting } from '@/lib/useGreeting'
 import { useT } from '@/lib/i18n'
 import { LanguageSwitch } from '@/ui/design-system/components/LanguageSwitch'
+import { notificationsStore } from '@/data/mock/notifications'
+import { useStore } from '@/data/mock/store'
 
 export interface HeaderProps {
   onOpenSearch: () => void
@@ -36,6 +38,7 @@ export function Header({
   onBack,
 }: HeaderProps) {
   const { t, lang } = useT()
+  const unreadCount = useStore(notificationsStore).filter((n) => n.unread).length
   const displayInitials = userInitials || (greetingName ? greetingName.slice(0, 2).toUpperCase() : 'U')
   const { greeting, dateLabel } = useGreeting(lang)
 
@@ -126,7 +129,7 @@ export function Header({
           onClick={onOpenNotifications}
         >
           <Bell />
-          <span className="bell-rose-dot" />
+          {unreadCount > 0 && <span className="bell-rose-dot" />}
         </button>
 
         {/* User Profile Avatar */}

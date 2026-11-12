@@ -200,6 +200,9 @@ button { cursor: pointer; }
 .sidebar-scroll-zone::-webkit-scrollbar-thumb { background: transparent; border-radius: 99px; }
 .sidebar-scroll-zone:hover::-webkit-scrollbar-thumb { background: rgba(192, 230, 253, 0.35); }
 .sidebar-nav-list { display: flex; flex-direction: column; gap: 6px; }
+.sidebar-group-wrapper { display: flex; flex-direction: column; gap: 4px; }
+.sidebar-group-title { padding: 14px 16px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sidebar-text-sub); user-select: none; }
+.sidebar-group-divider { height: 1px; background: rgba(192, 230, 253, 0.12); margin: 8px 8px; }
 
 /* Nav Item (48px rows, 16px spacing/padding) */
 .sidebar-nav-item { height: 48px; min-height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 0; background: transparent; color: var(--sidebar-text); font-size: 13.5px; font-weight: 500; text-align: start; border-radius: 99px; position: relative; cursor: pointer; white-space: nowrap; transition: background 0.18s, color 0.18s; margin-right: 12px; }
@@ -497,8 +500,9 @@ button { cursor: pointer; }
 .collection-item > svg { width: 16px; color: var(--sky); }
 
 .status { font-size: 10px !important; border-radius: 99px; padding: 5px 9px; background: var(--green-bg); color: var(--green-text) !important; font-weight: 600; }
-.status.pending, .status.low-stock { background: var(--amber-bg); color: var(--amber-text) !important; }
-.status.rejected, .status.overdue, .status.expiring, .status.expiring-batch { background: var(--rose-bg); color: var(--rose-text) !important; }
+.status.pending, .status.low-stock, .status.near-capacity, .status.partially-paid, .status.pending-clearance { background: var(--amber-bg); color: var(--amber-text) !important; }
+.status.rejected, .status.overdue, .status.expiring, .status.expiring-batch, .status.critical { background: var(--rose-bg); color: var(--rose-text) !important; }
+.status.inactive, .status.maintenance, .status.voided, .status.unpaid { background: var(--mist); color: var(--steel) !important; }
 
 .empty-hint { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted-text); font-size: 11px; margin: 30px; }
 .empty-hint svg { width: 15px; color: var(--story-em); }

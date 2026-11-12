@@ -16,7 +16,10 @@ import HomePage from '@/ui/pages/home'
 import ClientsPage from '@/ui/pages/clients'
 import DoctorProfilePage from '@/ui/pages/doctor-profile'
 import InvoicesPage from '@/ui/pages/invoices'
+import InvoicesSellInPage from '@/ui/pages/invoices-sell-in'
+import DistributionOverviewPage from '@/ui/pages/distribution-overview'
 import InvoiceReviewPage from '@/ui/pages/invoice-review'
+import WarehousesPage from '@/ui/pages/warehouses'
 import StockPage from '@/ui/pages/stock'
 import { StockDetailSheet } from '@/ui/pages/stock/components/StockDetailSheet'
 import SellInPage from '@/ui/pages/sell-in'
@@ -32,6 +35,8 @@ import LoginPage from '@/ui/pages/login'
 import { LogoutConfirmDialog } from '@/ui/pages/login/components/LogoutConfirmDialog'
 import { UploadInvoiceModal } from '@/ui/pages/invoices/components/UploadInvoiceModal'
 import MorePage from '@/ui/pages/more'
+import PerformanceAnalyticsPage from '@/ui/pages/performance-analytics'
+import CashInPage from '@/ui/pages/cash-in'
 import ReportsPage from '@/ui/pages/reports'
 import ProfilePage from '@/ui/pages/profile'
 import { AuthProvider, useAuth, canAccessPage } from '@/lib/auth'
@@ -254,14 +259,31 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Invoices' && canAccessPage('Invoices', role, user) && (
-            <InvoicesPage
-              onAdd={() => open('upload invoice')}
-              onItem={(invoice) => openInvoiceDetail(invoice.name)}
-              filter={pageFilter['Invoices']}
-              onClearFilter={() => clearPageFilter('Invoices')}
+          {active === 'Distribution Overview' && canAccessPage('Distribution Overview', role, user) && (
+            <DistributionOverviewPage
+              onNavigate={navigateTo}
               role={role}
               currentUserName={currentUserName}
+            />
+          )}
+          {(active === 'Invoices & Sell-in' || active === 'Invoices' || active === 'Sell-in') &&
+            canAccessPage(active, role, user) && (
+              <InvoicesSellInPage
+                initialTab={active === 'Sell-in' ? 'sell-in' : 'invoices'}
+                onAddInvoice={() => open('upload invoice')}
+                onItemInvoice={(invoice) => openInvoiceDetail(invoice.name)}
+                invoiceFilter={pageFilter['Invoices']}
+                onClearInvoiceFilter={() => clearPageFilter('Invoices')}
+                role={role}
+                currentUserName={currentUserName}
+                onAction={action}
+              />
+            )}
+          {active === 'Warehouses' && canAccessPage('Warehouses', role, user) && (
+            <WarehousesPage
+              role={role}
+              currentUserName={currentUserName}
+              onAction={action}
             />
           )}
           {active === 'Stock' && canAccessPage('Stock', role, user) && (
@@ -275,8 +297,27 @@ function AppContent() {
               currentUserName={currentUserName}
             />
           )}
-          {active === 'Sell-in' && canAccessPage('Sell-in', role, user) && <SellInPage onAction={action} />}
-          {active === 'Sell-out' && canAccessPage('Sell-out', role, user) && <SellOutPage />}
+          {active === 'Sell-out' && canAccessPage('Sell-out', role, user) && (
+            <SellOutPage
+              role={role}
+              currentUserName={currentUserName}
+              onAction={action}
+            />
+          )}
+          {active === 'Performance Analytics' && canAccessPage('Performance Analytics', role, user) && (
+            <PerformanceAnalyticsPage
+              role={role}
+              currentUserName={currentUserName}
+              onAction={action}
+            />
+          )}
+          {active === 'Cash In' && canAccessPage('Cash In', role, user) && (
+            <CashInPage
+              role={role}
+              currentUserName={currentUserName}
+              onAction={action}
+            />
+          )}
           {active === 'Returns' && canAccessPage('Returns', role, user) && <ReturnsPage onAction={action} />}
           {active === 'Targets' && canAccessPage('Targets', role, user) && <TargetsPage />}
           {active === 'Visits' && canAccessPage('Visits', role, user) && (
@@ -318,7 +359,15 @@ function AppContent() {
           {active === 'Territories' && canAccessPage('Territories', role, user) && <AdminPage initialSubpage="territories" />}
           {active === 'Audit log' && canAccessPage('Audit log', role, user) && <AdminPage initialSubpage="audit-log" />}
           {active === 'Settings' && (canAccessPage('Settings', role, user) ? (
-            <AdminPage initialSubpage="settings" />
+            <AdminPage
+              initialSubpage="settings"
+              currentUserName={currentUserName}
+              currentUserEmail={currentUserEmail}
+              role={role}
+              dark={dark}
+              onToggleDark={() => setDark(!dark)}
+              onAction={action}
+            />
           ) : (
             <ProfilePage
               userName={currentUserName}
@@ -375,6 +424,7 @@ function AppContent() {
         isOpen={overlay === 'notifications'}
         onClose={() => setOverlay(null)}
         onAction={action}
+        onNavigate={navigateTo}
       />
 
       {/* Log out Confirmation */}

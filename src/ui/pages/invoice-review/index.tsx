@@ -14,6 +14,7 @@ import { invoicesStore, updateInvoice } from '@/data/mock/invoices'
 import { salesOrdersStore } from '@/data/mock/sales-orders'
 import { customersStore } from '@/data/mock/customers'
 import { addAuditLog } from '@/data/mock/audit'
+import { addNotification } from '@/data/mock/notifications'
 
 export interface InvoiceReviewPageProps {
   invoiceName?: string | null
@@ -115,6 +116,14 @@ export default function InvoiceReviewPage({
           ? `Approved ${invoice.name} from sales order ${linkedOrder.id}`
           : `Approved ${invoice.name}`,
       })
+      addNotification({
+        title: 'Invoice Approved',
+        message: `${invoice.name} has been approved by ${user?.name || 'Unknown'}.`,
+        category: 'invoices',
+        priority: 'info',
+        time: 'Just now',
+        targetPage: 'Invoices & Sell-in',
+      })
       onAction(t('invoices.approveSuccess'))
       onClose()
     } finally {
@@ -152,6 +161,14 @@ export default function InvoiceReviewPage({
         time: 'Just now',
         details: `Rejected ${invoice.name}: ${rejectReason.trim()}`,
       })
+      addNotification({
+        title: 'Invoice Rejected',
+        message: `${invoice.name} was rejected by ${user?.name || 'Unknown'}: ${rejectReason.trim()}`,
+        category: 'invoices',
+        priority: 'warning',
+        time: 'Just now',
+        targetPage: 'Invoices & Sell-in',
+      })
       setRejectOpen(false)
       setRejectReason('')
       setRejectReasonError('')
@@ -186,6 +203,14 @@ export default function InvoiceReviewPage({
         actor: user?.name || 'Owner',
         time: 'Just now',
         details: `Resubmitted ${invoice.name} for review`,
+      })
+      addNotification({
+        title: 'Invoice Resubmitted',
+        message: `${invoice.name} has been resubmitted for review by ${user?.name || 'Owner'}.`,
+        category: 'invoices',
+        priority: 'info',
+        time: 'Just now',
+        targetPage: 'Invoices & Sell-in',
       })
       setResubmitOpen(false)
       setResubmitNote('')

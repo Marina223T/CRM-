@@ -3,12 +3,14 @@
 import { useRef } from 'react'
 import type { ElementType } from 'react'
 import {
-  Activity, ArrowUpRight, BarChart2, CalendarDays, ChevronLeft, ChevronRight,
+  Activity, ArrowUpRight, BarChart2, Boxes, CalendarDays, ChevronLeft, ChevronRight,
   ClipboardCheck, FileText, LayoutGrid, MapPin, Package,
-  Power, RotateCcw, Settings2, Shield, Stethoscope, Target, User, Users, Wallet,
+  Power, RotateCcw, Settings2, Shield, Stethoscope, Target, TrendingUp, User, Users,
+  Warehouse, Wallet, BadgeDollarSign,
 } from 'lucide-react'
 import { canAccessPage, type User as AuthUser } from '@/lib/auth'
 import { storedUsersStore } from '@/lib/auth/mock-users'
+import { invoicesStore } from '@/data/mock/invoices'
 import { useStore } from '@/data/mock/store'
 import { useT, type TranslationKey } from '@/lib/i18n'
 import { Logo } from './Logo'
@@ -20,6 +22,12 @@ const NAV_LABEL_MAP: Record<string, TranslationKey> = {
   'Stock': 'nav.stock',
   'Sell-in': 'nav.sellIn',
   'Sell-out': 'nav.sellOut',
+  'Distribution Management': 'nav.distributionManagement',
+  'Distribution Overview': 'nav.distributionOverview',
+  'Invoices & Sell-in': 'nav.invoicesSellIn',
+  'Warehouses': 'nav.warehouses',
+  'Performance Analytics': 'nav.performanceAnalytics',
+  'Cash In': 'nav.cashIn',
   'Returns': 'nav.returns',
   'Targets': 'nav.targets',
   'Visits': 'nav.visits',
@@ -62,6 +70,7 @@ export function Sidebar({
   const { t, lang } = useT()
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingCount = useStore(storedUsersStore).filter((u) => u.status === 'pending').length
+  const pendingInvoiceCount = useStore(invoicesStore).filter((i) => i.status === 'Pending').length
 
   const displayName = lang === 'ar' ? (user?.name_ar || userName) : userName
 
@@ -73,19 +82,32 @@ export function Sidebar({
     badgeTone?: 'amber'
   }
 
+  interface NavSection {
+    id: string
+    title?: string
+    items: NavItem[]
+  }
+
   // Standard items visible to both Admin and Rep
-  const baseNav: NavItem[] = [
+  const generalNav: NavItem[] = [
     { label: 'Dashboard', activeKey: 'Home', icon: LayoutGrid },
     { label: 'Clients', activeKey: 'Clients', icon: Users },
-    { label: 'Invoices', activeKey: 'Invoices', icon: FileText, badge: '5' },
     { label: 'Stock', activeKey: 'Stock', icon: Package },
-    { label: 'Sell-in', activeKey: 'Sell-in', icon: ArrowUpRight },
-    { label: 'Sell-out', activeKey: 'Sell-out', icon: Activity },
     { label: 'Returns', activeKey: 'Returns', icon: RotateCcw },
     { label: 'Targets', activeKey: 'Targets', icon: Target },
     { label: 'Visits', activeKey: 'Visits', icon: Stethoscope },
     { label: 'Visit plan', activeKey: 'Visit plan', icon: CalendarDays },
     { label: 'Budgets', activeKey: 'Budgets', icon: Wallet },
+  ]
+
+  // Distribution Management items
+  const distributionNav: NavItem[] = [
+    { label: 'Distribution Overview', activeKey: 'Distribution Overview', icon: Boxes },
+    { label: 'Invoices & Sell-in', activeKey: 'Invoices & Sell-in', icon: FileText, badge: pendingInvoiceCount > 0 ? String(pendingInvoiceCount) : undefined },
+    { label: 'Warehouses', activeKey: 'Warehouses', icon: Warehouse },
+    { label: 'Sell-out', activeKey: 'Sell-out', icon: Activity },
+    { label: 'Performance Analytics', activeKey: 'Performance Analytics', icon: TrendingUp },
+    { label: 'Cash In', activeKey: 'Cash In', icon: BadgeDollarSign },
   ]
 
   // Admin-only items
@@ -111,13 +133,24 @@ export function Sidebar({
     { label: 'My profile', activeKey: 'Profile', icon: User },
   ]
 
-  const candidateItems: NavItem[] = canAccessPage('Admin', role, user)
-    ? [...baseNav, ...adminNav]
-    : [...baseNav, ...repNav]
-
-  const navItems: NavItem[] = candidateItems.filter((item) =>
-    item.activeKey === 'Profile' || canAccessPage(item.activeKey, role, user)
-  )
+  const sections: NavSection[] = [
+    {
+      id: 'general',
+      items: generalNav.filter((item) => canAccessPage(item.activeKey, role, user)),
+    },
+    {
+      id: 'distribution',
+      title: 'Distribution Management',
+      items: distributionNav.filter((item) => canAccessPage(item.activeKey, role, user)),
+    },
+    {
+      id: 'admin-or-rep',
+      title: canAccessPage('Admin', role, user) ? 'Admin' : undefined,
+      items: (canAccessPage('Admin', role, user) ? adminNav : repNav).filter((item) =>
+        item.activeKey === 'Profile' || canAccessPage(item.activeKey, role, user)
+      ),
+    },
+  ]
 
   return (
     <aside
@@ -167,51 +200,70 @@ export function Sidebar({
       {/* Middle Nav Items Zone (Scrollable with thin scrollbar & edge mask) */}
       <div ref={scrollRef} className="sidebar-scroll-zone">
         <nav className="sidebar-nav-list" aria-label="Sidebar Links">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isItemActive = active === item.activeKey || (item.activeKey === 'Home' && active === 'Dashboard')
-            const translatedLabel = NAV_LABEL_MAP[item.label] ? t(NAV_LABEL_MAP[item.label]) : item.label
-
+          {sections.map((section) => {
+            if (section.items.length === 0) return null
             return (
-              <button
-                key={item.label}
-                className={`sidebar-nav-item ${isItemActive ? 'active' : ''}`}
-                onClick={() => onSelect(item.activeKey)}
-                title={translatedLabel}
-                aria-label={translatedLabel}
-              >
-                <div className="sidebar-item-icon">
-                  <Icon />
-                </div>
-                {!collapsed && (
-                  <span className="sidebar-item-label">{translatedLabel}</span>
+              <div key={section.id} className="sidebar-group-wrapper">
+                {section.title && (
+                  collapsed ? (
+                    <div className="sidebar-group-divider" aria-hidden="true" />
+                  ) : (
+                    <div className="sidebar-group-title">
+                      {NAV_LABEL_MAP[section.title] ? t(NAV_LABEL_MAP[section.title]) : section.title}
+                    </div>
+                  )
                 )}
-                {!collapsed && item.badge && (
-                  <span
-                    className="sidebar-item-badge"
-                    style={{
-                      background: item.badgeTone === 'amber' ? 'var(--amber, #f59e0b)' : undefined,
-                      color: item.badgeTone === 'amber' ? '#fff' : undefined,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-                {collapsed && item.badge && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: item.badgeTone === 'amber' ? 'var(--amber, #f59e0b)' : 'var(--ocean)',
-                    }}
-                  />
-                )}
-              </button>
+                {section.items.map((item) => {
+                  const Icon = item.icon
+                  const isItemActive =
+                    active === item.activeKey ||
+                    (item.activeKey === 'Home' && active === 'Dashboard') ||
+                    (item.activeKey === 'Invoices & Sell-in' && (active === 'Invoices' || active === 'Sell-in'))
+                  const translatedLabel = NAV_LABEL_MAP[item.label] ? t(NAV_LABEL_MAP[item.label]) : item.label
+
+                  return (
+                    <button
+                      key={item.label}
+                      className={`sidebar-nav-item ${isItemActive ? 'active' : ''}`}
+                      onClick={() => onSelect(item.activeKey)}
+                      title={translatedLabel}
+                      aria-label={translatedLabel}
+                    >
+                      <div className="sidebar-item-icon">
+                        <Icon />
+                      </div>
+                      {!collapsed && (
+                        <span className="sidebar-item-label">{translatedLabel}</span>
+                      )}
+                      {!collapsed && item.badge && (
+                        <span
+                          className="sidebar-item-badge"
+                          style={{
+                            background: item.badgeTone === 'amber' ? 'var(--amber, #f59e0b)' : undefined,
+                            color: item.badgeTone === 'amber' ? '#fff' : undefined,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      {collapsed && item.badge && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: item.badgeTone === 'amber' ? 'var(--amber, #f59e0b)' : 'var(--ocean)',
+                          }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             )
           })}
         </nav>

@@ -2,7 +2,7 @@ import { visitsMockData, type VisitRecord } from '@/ui/pages/visits/mock-data'
 import { addAuditLog } from './audit'
 import { createStore } from './store'
 
-export type StoredVisit = VisitRecord & { updated_at?: string }
+export type StoredVisit = VisitRecord & { updated_at?: string; doctorId?: string }
 
 export const visitsStore = createStore<StoredVisit[]>('visits', visitsMockData as StoredVisit[])
 

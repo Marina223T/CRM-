@@ -1,3 +1,5 @@
+import { notificationsStore, addNotification, type NotificationItem } from '@/data/mock/notifications'
+
 export interface MockNotice {
   id: string
   title: string
@@ -7,21 +9,21 @@ export interface MockNotice {
 }
 
 export const mockNotificationsList: MockNotice[] = [
-  { id: 'n-1', title: 'Invoice approval requested', time: '1 hour ago', unread: true, dotClass: 'n-0' },
-  { id: 'n-2', title: 'Bevato is low in North warehouse', time: '2 hours ago', unread: true, dotClass: 'n-1' },
-  { id: 'n-3', title: 'Batch CW-2401 expires in 12 days', time: '3 hours ago', unread: true, dotClass: 'n-2' },
+  { id: 'notif-001', title: 'Invoice approval requested', time: '25 mins ago', unread: true, dotClass: 'n-0' },
+  { id: 'notif-002', title: 'Cheque pending clearance', time: '1 hour ago', unread: true, dotClass: 'n-1' },
+  { id: 'notif-003', title: 'Alexandria warehouse near capacity', time: '3 hours ago', unread: true, dotClass: 'n-2' },
 ]
 
 export const earlierNotificationsList: MockNotice[] = [
-  { id: 'n-4', title: 'Invoice INV-1042 was rejected', time: 'Yesterday', unread: false, dotClass: 'n-2' },
+  { id: 'notif-005', title: 'Batch CW-2401 nearing expiry', time: 'Yesterday', unread: false, dotClass: 'n-2' },
 ]
 
 export function addMockNotification(title: string): void {
-  mockNotificationsList.unshift({
-    id: `n-${Date.now()}`,
+  addNotification({
     title,
+    message: title,
+    category: 'system',
+    priority: 'info',
     time: 'Just now',
-    unread: true,
-    dotClass: 'n-0',
   })
 }

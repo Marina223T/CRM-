@@ -7,6 +7,11 @@ export const ALL_STANDARD_PAGES = [
   'Stock',
   'Sell-in',
   'Sell-out',
+  'Distribution Overview',
+  'Invoices & Sell-in',
+  'Warehouses',
+  'Performance Analytics',
+  'Cash In',
   'Returns',
   'Targets',
   'Visits',
@@ -77,6 +82,14 @@ export function canAccessPage(
 
   const permissions = getUserPermissions(user, role)
   const targetPage = page === 'Home' ? 'Dashboard' : page
+
+  if (targetPage === 'Invoices & Sell-in') {
+    return (
+      permissions.pages.includes('Invoices & Sell-in') ||
+      permissions.pages.includes('Invoices') ||
+      permissions.pages.includes('Sell-in')
+    )
+  }
 
   return (
     permissions.pages.includes(targetPage) ||

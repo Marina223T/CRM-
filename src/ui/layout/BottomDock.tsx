@@ -37,8 +37,13 @@ export function BottomDock({ active, onSelect, user, role = 'rep' }: BottomDockP
       {nav.map(({ label, pageKey, icon: Icon }) => (
         <button
           key={pageKey}
-          className={active === pageKey ? 'active' : ''}
-          onClick={() => onSelect(pageKey)}
+          className={
+            active === pageKey ||
+            (pageKey === 'Invoices' && (active === 'Invoices & Sell-in' || active === 'Sell-in'))
+              ? 'active'
+              : ''
+          }
+          onClick={() => onSelect(pageKey === 'Invoices' ? 'Invoices & Sell-in' : pageKey)}
         >
           <Icon />
           <span>{label}</span>

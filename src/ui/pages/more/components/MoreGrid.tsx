@@ -8,11 +8,12 @@ export interface MoreGridProps {
 }
 
 export function MoreGrid({ onSelectPage, onAction }: MoreGridProps) {
-  const { t } = useT()
+  const { t, lang } = useT()
   return (
     <div className="more-grid">
       {moreLinksMockData.map((item) => {
         const Icon = item.icon
+        const displayName = lang === 'ar' && item.name_ar ? item.name_ar : item.name
         return (
           <button
             key={item.name}
@@ -20,14 +21,14 @@ export function MoreGrid({ onSelectPage, onAction }: MoreGridProps) {
               if (item.targetPage) {
                 onSelectPage(item.targetPage)
               } else {
-                onAction(t('more.itemOpened', { name: item.name }))
+                onAction(t('more.itemOpened', { name: displayName }))
               }
             }}
           >
             <div>
               <Icon />
             </div>
-            <strong>{item.name}</strong>
+            <strong>{displayName}</strong>
             <ChevronRight />
           </button>
         )
